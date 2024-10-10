@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  database: 
+    container_name: database-app 
+    restart: always 
+    build: 
+      context: ./sql
+      dockerfile: ../docker/mysql/Dockerfile
+    ports: 
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - ./sql/db-init:/docker-entrypoint-initdb.d
+    env_file:
+      - .env
+    networks:
+      - hh-net
+
+  backend:
+    container_name: backend-app
+    restart: always
+    build:
+      context: ./backend
+      dockerfile: ../docker/django/Dockerfile
+    env_file:
+      - .env
+    command: ["./wait.sh", "${DB_HOST:-database}:${MYSQL_PORT:-3306}", "--timeout=30", "--", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "${BACKEND_PORT:-8001}:8000"
+    depends_on:
+      - database
+    links: 
+      - database
+    networks:
+      - hh-net
+
+  frontend:
+    container_name: frontend-app
+    restart: always
+    env_file:
+      - ./frontend/.env
+    build:
+      context: ./frontend
+      dockerfile: ../docker/react/Dockerfile
+    ports: 
+      - "${HOST_PORT:-3000}:3000"
+    networks:
+      - hh-net
+
+networks:
+  hh-net:
+    driver: bridge
